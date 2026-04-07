@@ -1,0 +1,8 @@
+# Environment variables — NEVER commit this
+.env
+
+# Dependencies
+node_modules/
+
+# OS
+.DS_Store

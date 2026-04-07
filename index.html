@@ -1,0 +1,1180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LinkedIn Post Agent</title>
+<style>
+/* ─── RESET & BASE ─────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --blue:      #0A66C2;
+  --blue-dk:   #004182;
+  --blue-lt:   #EBF3FB;
+  --green:     #057642;
+  --red:       #CC1016;
+  --purple:    #6B2FBF;
+  --orange:    #D97706;
+  --gold:      #B45309;
+  --bg:        #F3F2EF;
+  --white:     #FFFFFF;
+  --border:    #E0DFDC;
+  --text:      #191919;
+  --muted:     #666666;
+  --shadow:    0 0 0 1px rgba(0,0,0,.08), 0 2px 6px rgba(0,0,0,.08);
+  --radius:    10px;
+}
+body {
+  font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+/* ─── HEADER ────────────────────────────────────────── */
+header {
+  background: var(--white);
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 100;
+  padding: 0 24px;
+  height: 52px;
+  display: flex; align-items: center; gap: 12px;
+}
+.logo-svg { width: 34px; height: 34px; flex-shrink: 0; }
+.header-title { font-size: 17px; font-weight: 700; color: var(--text); }
+.header-badge {
+  background: var(--blue); color: white;
+  font-size: 11px; font-weight: 600;
+  padding: 2px 8px; border-radius: 12px;
+}
+#header-user {
+  margin-left: auto; display: none; align-items: center; gap: 8px;
+  font-size: 13px; color: var(--muted);
+}
+.user-avatar {
+  width: 30px; height: 30px; border-radius: 50%;
+  background: var(--blue); color: white;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700;
+}
+
+/* ─── STEP INDICATOR ────────────────────────────────── */
+.step-indicator {
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px 24px 0;
+  max-width: 700px; margin: 0 auto;
+}
+.si-dot {
+  width: 32px; height: 32px; border-radius: 50%;
+  border: 2px solid #C0BFB8;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700; color: var(--muted);
+  flex-shrink: 0; transition: all .25s; background: var(--white);
+  position: relative;
+}
+.si-dot.active  { border-color: var(--blue); color: var(--blue); }
+.si-dot.done    { border-color: var(--blue); background: var(--blue); color: white; }
+.si-label {
+  position: absolute; top: calc(100% + 5px);
+  font-size: 10px; font-weight: 500; white-space: nowrap;
+  color: var(--muted); left: 50%; transform: translateX(-50%);
+}
+.si-dot.active .si-label { color: var(--blue); }
+.si-dot.done   .si-label { color: var(--blue); }
+.si-line {
+  flex: 1; height: 2px; background: #C0BFB8;
+  max-width: 80px; transition: background .25s;
+}
+.si-line.done { background: var(--blue); }
+
+/* ─── MAIN CONTAINER ────────────────────────────────── */
+main { max-width: 900px; margin: 0 auto; padding: 36px 16px 60px; }
+
+/* ─── STEP SCREENS ──────────────────────────────────── */
+.screen {
+  opacity: 0; display: none;
+  animation: fadeIn .3s ease forwards;
+}
+.screen.active { display: block; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* ─── CARD ──────────────────────────────────────────── */
+.card {
+  background: var(--white);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 28px 32px;
+}
+.card-title   { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+.card-sub     { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+
+/* ─── FORM ELEMENTS ─────────────────────────────────── */
+.form-group   { margin-bottom: 22px; }
+.form-label   { font-weight: 600; font-size: 13px; margin-bottom: 8px; display: block; }
+textarea, input[type="text"] {
+  width: 100%; border: 1.5px solid var(--border); border-radius: 8px;
+  padding: 12px 14px; font-size: 15px; font-family: inherit;
+  color: var(--text); background: var(--white); outline: none;
+  transition: border-color .15s, box-shadow .15s;
+}
+textarea:focus, input[type="text"]:focus {
+  border-color: var(--blue); box-shadow: 0 0 0 3px rgba(10,102,194,.12);
+}
+textarea { resize: vertical; }
+
+/* ─── CHIPS ─────────────────────────────────────────── */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  padding: 7px 14px; border-radius: 20px;
+  border: 1.5px solid var(--border); font-size: 13px; font-weight: 500;
+  cursor: pointer; user-select: none; background: var(--white);
+  color: var(--muted); transition: all .15s;
+}
+.chip:hover { border-color: var(--blue); color: var(--blue); }
+.chip.sel   { border-color: var(--blue); background: var(--blue-lt); color: var(--blue); font-weight: 600; }
+
+/* ─── BUTTONS ───────────────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 11px 24px; border-radius: 24px; font-size: 15px; font-weight: 600;
+  cursor: pointer; border: none; transition: all .15s; font-family: inherit;
+  text-decoration: none; white-space: nowrap;
+}
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn-primary  { background: var(--blue); color: white; }
+.btn-primary:hover:not(:disabled) { background: var(--blue-dk); }
+.btn-outline  { background: transparent; color: var(--blue); border: 1.5px solid var(--blue); }
+.btn-outline:hover:not(:disabled) { background: var(--blue-lt); }
+.btn-ghost    { background: transparent; color: var(--muted); border: 1.5px solid var(--border); }
+.btn-ghost:hover:not(:disabled) { background: var(--bg); }
+.btn-success  { background: var(--green); color: white; }
+.btn-success:hover:not(:disabled) { background: #045C32; }
+.btn-sm { padding: 7px 16px; font-size: 13px; }
+.btn-full { width: 100%; }
+
+/* ─── SPINNER ───────────────────────────────────────── */
+.spinner {
+  width: 18px; height: 18px; border-radius: 50%;
+  border: 2.5px solid rgba(255,255,255,.4); border-top-color: white;
+  animation: spin .7s linear infinite; flex-shrink: 0;
+}
+.spinner-blue { border-color: rgba(10,102,194,.2); border-top-color: var(--blue); }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ─── ERROR BANNER ──────────────────────────────────── */
+.error-box {
+  background: #FFF0F0; border: 1px solid #FFCDD2; border-radius: 8px;
+  padding: 14px 18px; color: var(--red); font-size: 14px;
+  display: flex; gap: 10px; align-items: flex-start; margin-bottom: 16px;
+}
+.error-box button { margin-top: 10px; }
+
+/* ════════════════════════════════════════════════════════
+   STEP 1 — CONFIGURE
+══════════════════════════════════════════════════════ */
+#topic-input { min-height: 90px; font-size: 16px; }
+
+/* ════════════════════════════════════════════════════════
+   STEP 2 — SEARCHING
+══════════════════════════════════════════════════════ */
+.loading-screen {
+  min-height: 420px; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 24px; text-align: center;
+  padding: 40px;
+}
+.loading-screen h2 { font-size: 20px; }
+.loading-screen p  { color: var(--muted); font-size: 14px; max-width: 360px; }
+
+.progress-wrap { width: 320px; height: 6px; background: #E0DFDC; border-radius: 4px; overflow: hidden; }
+.progress-bar  { height: 100%; background: var(--blue); border-radius: 4px; width: 0%; transition: width .4s linear; }
+
+.typewriter { font-size: 15px; color: var(--muted); min-height: 24px; font-style: italic; }
+
+.claude-logo {
+  width: 56px; height: 56px; border-radius: 50%; background: var(--blue);
+  display: flex; align-items: center; justify-content: center;
+  animation: pulse 1.8s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%,100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(10,102,194,.4); }
+  50%      { transform: scale(1.05); box-shadow: 0 0 0 12px rgba(10,102,194,0); }
+}
+
+/* ════════════════════════════════════════════════════════
+   STEP 3 — PICK YOUR POST
+══════════════════════════════════════════════════════ */
+.source-pills { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 20px; }
+.source-pill {
+  padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600;
+  background: #F0F0F0; color: var(--muted);
+}
+
+.posts-grid {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 20px;
+}
+.post-card {
+  border: 2px solid var(--border); border-radius: var(--radius);
+  padding: 20px; cursor: pointer; transition: all .2s;
+  background: var(--white); position: relative;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.post-card:hover { border-color: #A0C4E8; box-shadow: 0 2px 12px rgba(10,102,194,.12); }
+.post-card.selected { border-color: var(--blue); box-shadow: 0 0 0 2px var(--blue); }
+.post-card.selected::after {
+  content: '✓'; position: absolute; top: 12px; right: 12px;
+  width: 22px; height: 22px; background: var(--blue); color: white;
+  border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700; line-height: 22px; text-align: center;
+}
+
+.card-badges { display: flex; gap: 6px; flex-wrap: wrap; }
+.angle-badge, .reach-badge {
+  padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700;
+}
+/* angle colors */
+.badge-stat        { background: #EBF3FB; color: var(--blue); }
+.badge-contrarian  { background: #FEE2E2; color: var(--red); }
+.badge-story       { background: #EDE9FE; color: var(--purple); }
+.badge-howto       { background: #D1FAE5; color: var(--green); }
+.badge-prediction  { background: #FEF3C7; color: var(--orange); }
+/* reach colors */
+.badge-viral  { background: #FEF3C7; color: var(--gold); }
+.badge-high   { background: #EBF3FB; color: var(--blue); }
+.badge-medium { background: #F3F2EF; color: var(--muted); }
+
+.post-hook    { font-weight: 700; font-size: 15px; line-height: 1.35; }
+.post-preview { font-size: 13px; color: var(--muted); line-height: 1.5; }
+.post-why     { font-size: 12px; font-style: italic; color: var(--green); }
+.post-card .btn { margin-top: auto; align-self: flex-start; }
+
+/* 5th card centered */
+.post-card:nth-child(5):last-child {
+  grid-column: 1 / -1; max-width: calc(50% - 8px); justify-self: center; width: 100%;
+}
+
+/* ════════════════════════════════════════════════════════
+   STEP 4 — CUSTOMIZE
+══════════════════════════════════════════════════════ */
+.split { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+
+.editor-side { display: flex; flex-direction: column; gap: 16px; }
+#post-editor { min-height: 260px; font-size: 14px; line-height: 1.65; }
+.char-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--muted); }
+.char-row .over { color: var(--red); font-weight: 700; }
+
+/* toggle switch */
+.toggle-row { display: flex; align-items: center; gap: 10px; }
+.toggle-label { font-weight: 600; font-size: 14px; }
+.toggle-sw {
+  position: relative; width: 44px; height: 24px; cursor: pointer;
+}
+.toggle-sw input { opacity: 0; width: 0; height: 0; }
+.toggle-track {
+  position: absolute; inset: 0; background: #C0BFB8; border-radius: 12px;
+  transition: background .2s;
+}
+.toggle-track::before {
+  content: ''; position: absolute; width: 18px; height: 18px;
+  top: 3px; left: 3px; background: white; border-radius: 50%;
+  transition: transform .2s;
+}
+.toggle-sw input:checked + .toggle-track { background: var(--blue); }
+.toggle-sw input:checked + .toggle-track::before { transform: translateX(20px); }
+
+.image-opts { display: none; flex-direction: column; gap: 12px; padding-top: 4px; }
+.image-opts.open { display: flex; }
+.style-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+
+#img-preview-box { border-radius: 8px; overflow: hidden; }
+#img-preview-box img { width: 100%; display: block; border-radius: 8px; }
+
+/* ── LINKEDIN PREVIEW ─── */
+.li-preview-card {
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--white); overflow: hidden;
+  box-shadow: var(--shadow); position: relative;
+}
+.li-preview-head {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 14px 14px 0;
+}
+.li-avatar-lg {
+  width: 48px; height: 48px; border-radius: 50%; flex-shrink: 0;
+  background: var(--blue); color: white;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 17px;
+}
+.li-name { font-weight: 700; font-size: 14px; line-height: 1.2; }
+.li-meta { font-size: 12px; color: var(--muted); }
+.li-body { padding: 12px 14px; }
+.li-post-text {
+  font-size: 14px; line-height: 1.65; white-space: pre-wrap;
+  word-break: break-word; min-height: 60px;
+}
+.li-post-img { width: 100%; display: block; max-height: 280px; object-fit: cover; }
+.li-actions {
+  padding: 8px 14px; border-top: 1px solid var(--border);
+  display: flex; gap: 0;
+}
+.li-action {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 5px;
+  font-size: 12px; color: var(--muted); font-weight: 600;
+  padding: 7px 4px; border-radius: 6px; cursor: pointer;
+  transition: background .15s;
+}
+.li-action:hover { background: var(--bg); }
+.li-wm {
+  position: absolute; bottom: 48px; right: 12px;
+  font-size: 10px; color: #C0BFB8; font-weight: 700; letter-spacing: .5px;
+}
+
+/* ════════════════════════════════════════════════════════
+   STEP 5 — REVIEW
+══════════════════════════════════════════════════════ */
+.review-center { max-width: 560px; margin: 0 auto; }
+.review-btns { display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap; }
+.posting-as { font-size: 12px; color: var(--muted); margin-top: 12px; text-align: center; }
+.posting-as a { color: var(--blue); text-decoration: none; }
+
+/* ════════════════════════════════════════════════════════
+   STEP 6 — SUCCESS
+══════════════════════════════════════════════════════ */
+.success-center {
+  text-align: center; padding: 60px 20px; display: flex; flex-direction: column;
+  align-items: center; gap: 16px;
+}
+.success-icon {
+  width: 80px; height: 80px; background: var(--green); border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  animation: pop .4s cubic-bezier(.36,.07,.19,.97);
+}
+@keyframes pop {
+  0%  { transform: scale(0); }
+  70% { transform: scale(1.15); }
+  100%{ transform: scale(1); }
+}
+.success-title { font-size: 26px; font-weight: 700; }
+.success-sub   { color: var(--muted); }
+
+/* confetti */
+#confetti-wrap { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 999; }
+.conf {
+  position: fixed; top: -12px; width: 10px; height: 10px;
+  border-radius: 2px; animation: confFall linear forwards;
+}
+@keyframes confFall {
+  to { transform: translateY(105vh) rotate(720deg); opacity: 0; }
+}
+
+/* ─── RESPONSIVE ─────────────────────────────────────── */
+@media (max-width: 660px) {
+  main { padding: 24px 12px 60px; }
+  .card { padding: 20px 18px; }
+  .posts-grid { grid-template-columns: 1fr; }
+  .post-card:nth-child(5):last-child { max-width: 100%; }
+  .split { grid-template-columns: 1fr; }
+  .review-btns { flex-direction: column; }
+  .review-btns .btn { width: 100%; justify-content: center; }
+}
+</style>
+</head>
+<body>
+
+<!-- ── HEADER ── -->
+<header>
+  <svg class="logo-svg" viewBox="0 0 34 34" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect width="34" height="34" rx="6" fill="#0A66C2"/>
+    <path d="M7 13.5h4.5V27H7V13.5ZM9.25 11.5a2.25 2.25 0 1 1 0-4.5 2.25 2.25 0 0 1 0 4.5ZM27 27h-4.5v-6.75c0-1.61-.03-3.68-2.24-3.68-2.24 0-2.58 1.75-2.58 3.56V27H13.2V13.5h4.32v1.84h.06c.6-1.14 2.08-2.34 4.27-2.34 4.58 0 5.42 3.01 5.42 6.92V27Z" fill="white"/>
+  </svg>
+  <span class="header-title">Post Agent</span>
+  <span class="header-badge">AI</span>
+  <div id="header-user">
+    <div class="user-avatar" id="header-avatar">?</div>
+    <span id="header-name">…</span>
+  </div>
+</header>
+
+<!-- ── STEP INDICATOR ── -->
+<div class="step-indicator" id="step-indicator">
+  <div class="si-dot active" id="si-1"><span class="si-label">Configure</span>1</div>
+  <div class="si-line" id="sl-1"></div>
+  <div class="si-dot" id="si-2"><span class="si-label">Search</span>2</div>
+  <div class="si-line" id="sl-2"></div>
+  <div class="si-dot" id="si-3"><span class="si-label">Pick</span>3</div>
+  <div class="si-line" id="sl-3"></div>
+  <div class="si-dot" id="si-4"><span class="si-label">Customize</span>4</div>
+  <div class="si-line" id="sl-4"></div>
+  <div class="si-dot" id="si-5"><span class="si-label">Review</span>5</div>
+  <div class="si-line" id="sl-5"></div>
+  <div class="si-dot" id="si-6"><span class="si-label">Live!</span>6</div>
+</div>
+
+<main>
+
+<!-- ══════════════════════════════════════════════════════
+     STEP 1 — CONFIGURE
+══════════════════════════════════════════════════════ -->
+<div id="s1" class="screen active">
+  <div class="card">
+    <div class="card-title">What do you want to post about?</div>
+    <div class="card-sub">Claude will research the topic and generate 5 unique posts with different angles.</div>
+
+    <div id="err-1" class="error-box" style="display:none">
+      <div>
+        <strong>Something went wrong</strong><br><span id="err-1-msg"></span>
+        <br><button class="btn btn-ghost btn-sm" style="margin-top:8px" onclick="document.getElementById('err-1').style.display='none'">Dismiss</button>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Topic *</label>
+      <textarea id="topic-input" placeholder="What topic do you want to post about today? e.g. How AI is changing real estate valuations in 2025"></textarea>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Author name &amp; role</label>
+      <input type="text" id="author-input" value="Mani Grewal - Product Manager">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Tone <span style="font-weight:400;color:var(--muted)">(multi-select)</span></label>
+      <div class="chips" id="tone-chips">
+        <div class="chip" data-tone="Thoughtful">Thoughtful</div>
+        <div class="chip" data-tone="Bold & Direct">Bold &amp; Direct</div>
+        <div class="chip" data-tone="Storytelling">Storytelling</div>
+        <div class="chip" data-tone="Data-driven">Data-driven</div>
+        <div class="chip" data-tone="Expert Insight">Expert Insight</div>
+        <div class="chip" data-tone="Contrarian">Contrarian</div>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Post length</label>
+      <div class="chips" id="length-chips">
+        <div class="chip" data-len="75">Short ~75w</div>
+        <div class="chip sel" data-len="100">Medium ~100w</div>
+        <div class="chip" data-len="125">Long ~125w</div>
+      </div>
+    </div>
+
+    <button class="btn btn-primary btn-full" id="gen-btn" style="font-size:16px;padding:14px">
+      Search &amp; Generate 5 Posts →
+    </button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     STEP 2 — SEARCHING
+══════════════════════════════════════════════════════ -->
+<div id="s2" class="screen">
+  <div class="card loading-screen">
+    <div class="claude-logo">
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="white"><path d="M14 2C7.37 2 2 7.37 2 14s5.37 12 12 12 12-5.37 12-12S20.63 2 14 2zm0 4a2 2 0 1 1 0 4 2 2 0 0 1 0-4zm0 14.5a8.5 8.5 0 0 1-7-3.67l.08-.08C9 15.5 11 14.5 14 14.5s5 1 6.92 2.25l.08.08A8.5 8.5 0 0 1 14 20.5z"/></svg>
+    </div>
+    <div>
+      <h2>Researching your topic…</h2>
+      <p style="margin-top:4px">Claude is scanning sources across the internet to find the freshest insights</p>
+    </div>
+    <div class="progress-wrap"><div class="progress-bar" id="prog-bar"></div></div>
+    <p class="typewriter" id="typewriter-txt">Scanning LinkedIn for what's trending...</p>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     STEP 3 — PICK YOUR POST
+══════════════════════════════════════════════════════ -->
+<div id="s3" class="screen">
+  <div class="card">
+    <div class="card-title">5 Posts Ready — Pick Your Favorite</div>
+    <div class="card-sub">Each takes a completely different angle on <em id="topic-display"></em></div>
+
+    <div id="err-3" class="error-box" style="display:none">
+      <div><strong>Error</strong><br><span id="err-3-msg"></span></div>
+    </div>
+
+    <div id="sources-row" class="source-pills"></div>
+    <div id="posts-grid" class="posts-grid"></div>
+
+    <button class="btn btn-primary btn-full" id="use-post-btn" disabled style="font-size:16px;padding:14px">
+      Use Selected Post →
+    </button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     STEP 4 — CUSTOMIZE
+══════════════════════════════════════════════════════ -->
+<div id="s4" class="screen">
+  <div class="card">
+    <div class="card-title">Customize Your Post</div>
+    <div class="card-sub">Edit the text, add an image, and see your live LinkedIn preview.</div>
+
+    <div class="split">
+      <!-- LEFT: EDITOR -->
+      <div class="editor-side">
+        <div>
+          <label class="form-label">Edit Your Post</label>
+          <textarea id="post-editor" rows="12"></textarea>
+          <div class="char-row">
+            <span id="char-count">0 / 3000</span>
+            <button class="btn btn-ghost btn-sm" id="regen-btn">↻ Regenerate this post</button>
+          </div>
+        </div>
+
+        <!-- IMAGE TOGGLE -->
+        <div>
+          <div class="toggle-row">
+            <span class="toggle-label">Add AI Image?</span>
+            <label class="toggle-sw">
+              <input type="checkbox" id="img-toggle">
+              <div class="toggle-track"></div>
+            </label>
+            <span style="font-size:13px;color:var(--muted)">Powered by DALL-E 3</span>
+          </div>
+          <div class="image-opts" id="img-opts">
+            <div>
+              <label class="form-label" style="margin-bottom:6px">Image style</label>
+              <div class="chips style-chips" id="style-chips">
+                <div class="chip sel" data-style="Professional Photo">Professional Photo</div>
+                <div class="chip" data-style="Abstract Visual">Abstract Visual</div>
+                <div class="chip" data-style="Minimalist Design">Minimalist Design</div>
+                <div class="chip" data-style="Bold Graphic">Bold Graphic</div>
+              </div>
+            </div>
+            <button class="btn btn-outline" id="gen-img-btn">Generate Image</button>
+            <div id="img-preview-box" style="display:none">
+              <img id="gen-img" alt="Generated image">
+              <button class="btn btn-ghost btn-sm" id="rm-img-btn" style="margin-top:8px">✕ Remove Image</button>
+            </div>
+            <div id="err-img" class="error-box" style="display:none">
+              <span id="err-img-msg"></span>
+            </div>
+          </div>
+        </div>
+
+        <button class="btn btn-primary btn-full" id="to-review-btn" style="font-size:16px;padding:14px">
+          Looks Good — Review →
+        </button>
+      </div>
+
+      <!-- RIGHT: LIVE PREVIEW -->
+      <div>
+        <label class="form-label">Live LinkedIn Preview</label>
+        <div class="li-preview-card" id="li-preview">
+          <div class="li-preview-head">
+            <div class="li-avatar-lg" id="prev-avatar">I</div>
+            <div>
+              <div class="li-name" id="prev-name">Mani Grewal</div>
+              <div class="li-meta">Mani Grewal - Product Manager 🌐</div>
+            </div>
+          </div>
+          <div id="prev-img-wrap" style="display:none">
+            <img class="li-post-img" id="prev-img" alt="">
+          </div>
+          <div class="li-body">
+            <div class="li-post-text" id="prev-text">Your post will appear here…</div>
+          </div>
+          <div class="li-wm">in</div>
+          <div class="li-actions">
+            <div class="li-action">👍 Like</div>
+            <div class="li-action">💬 Comment</div>
+            <div class="li-action">🔁 Repost</div>
+            <div class="li-action">✉️ Send</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     STEP 5 — REVIEW & APPROVE
+══════════════════════════════════════════════════════ -->
+<div id="s5" class="screen">
+  <div class="card">
+    <div class="card-title" style="text-align:center">Ready to Go Live? 🚀</div>
+    <div class="card-sub" style="text-align:center">This is exactly what will appear on LinkedIn.</div>
+
+    <div id="err-5" class="error-box" style="display:none">
+      <div><strong>Posting failed</strong><br><span id="err-5-msg"></span></div>
+    </div>
+
+    <div class="review-center">
+      <div class="li-preview-card" id="review-preview">
+        <div class="li-preview-head">
+          <div class="li-avatar-lg" id="rev-avatar">I</div>
+          <div>
+            <div class="li-name" id="rev-name">Mani Grewal</div>
+            <div class="li-meta">Mani Grewal - Product Manager · Just now · 🌐</div>
+          </div>
+        </div>
+        <div id="rev-img-wrap" style="display:none">
+          <img class="li-post-img" id="rev-img" alt="">
+        </div>
+        <div class="li-body">
+          <div class="li-post-text" id="rev-text"></div>
+        </div>
+        <div class="li-wm">in</div>
+        <div class="li-actions">
+          <div class="li-action">👍 Like</div>
+          <div class="li-action">💬 Comment</div>
+          <div class="li-action">🔁 Repost</div>
+          <div class="li-action">✉️ Send</div>
+        </div>
+      </div>
+
+      <div class="review-btns">
+        <button class="btn btn-ghost" id="back-to-edit-btn" style="flex:1">← Edit Post</button>
+        <button class="btn btn-success" id="post-btn" style="flex:2;font-size:16px;padding:14px">
+          ✓ Confirm &amp; Post to LinkedIn
+        </button>
+      </div>
+      <p class="posting-as">
+        Posting as Mani Grewal ·
+        <a href="https://www.linkedin.com/in/igrewali/" target="_blank">linkedin.com/Mani/</a>
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     STEP 6 — SUCCESS
+══════════════════════════════════════════════════════ -->
+<div id="s6" class="screen">
+  <div id="confetti-wrap"></div>
+  <div class="card">
+    <div class="success-center">
+      <div class="success-icon">
+        <svg width="38" height="38" viewBox="0 0 24 24" fill="white"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+      </div>
+      <div class="success-title">Your post is live on LinkedIn! 🎉</div>
+      <div class="success-sub">First mover advantage secured.</div>
+      <a href="https://www.linkedin.com/in/igrewali/" target="_blank"
+         class="btn btn-outline" style="font-size:15px">
+        View Your Post on LinkedIn
+      </a>
+      <button class="btn btn-ghost" id="restart-btn">Create Another Post</button>
+    </div>
+  </div>
+</div>
+
+</main>
+
+<script>
+/* ═══════════════════════════════════════════════════════
+   STATE
+══════════════════════════════════════════════════════ */
+const API = 'http://localhost:3000';
+
+const S = {
+  step       : 1,
+  personId   : null,
+  personName : 'Mani Grewal',
+  topic      : '',
+  author     : 'Mani Grewal - Product Manager',
+  tones      : [],          // selected tone labels
+  length     : 100,
+  data       : null,        // { sources, posts } from /api/generate
+  selectedId : null,        // post id
+  postText   : '',
+  imageUrl   : null,
+  imageStyle : 'Professional Photo',
+};
+
+/* ═══════════════════════════════════════════════════════
+   INIT
+══════════════════════════════════════════════════════ */
+document.addEventListener('DOMContentLoaded', () => {
+  loadMe();
+  bindStep1();
+  bindStep4();
+  bindStep5();
+  bindStep6();
+});
+
+async function loadMe() {
+  // Load personId from server config (env var) as baseline
+  try {
+    const cfg = await apiFetch('/api/config');
+    if (cfg.personId) S.personId = cfg.personId;
+  } catch (_) { /* non-fatal */ }
+
+  // Override with live LinkedIn profile if token works
+  try {
+    const d = await apiFetch('/api/linkedin/me');
+    if (d.id) {
+      S.personId = d.id;
+      const name = [d.localizedFirstName, d.localizedLastName].filter(Boolean).join(' ');
+      if (name) S.personName = name;
+    }
+    const hu = document.getElementById('header-user');
+    hu.style.display = 'flex';
+    document.getElementById('header-avatar').textContent = initials(S.personName);
+    document.getElementById('header-name').textContent   = S.personName;
+  } catch (_) { /* non-fatal */ }
+}
+
+/* ═══════════════════════════════════════════════════════
+   NAVIGATION
+══════════════════════════════════════════════════════ */
+function goTo(n) {
+  document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
+  const screen = document.getElementById(`s${n}`);
+  if (screen) screen.classList.add('active');
+  S.step = n;
+  updateIndicator(n);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function updateIndicator(active) {
+  for (let i = 1; i <= 6; i++) {
+    const dot  = document.getElementById(`si-${i}`);
+    const line = document.getElementById(`sl-${i}`);
+    dot.classList.remove('active', 'done');
+    if (i < active)  dot.classList.add('done');
+    if (i === active) dot.classList.add('active');
+    if (line) {
+      line.classList.remove('done');
+      if (i < active) line.classList.add('done');
+    }
+  }
+  // update done dots to show ✓ inside
+  for (let i = 1; i <= 6; i++) {
+    const dot  = document.getElementById(`si-${i}`);
+    const label = dot.querySelector('.si-label').textContent;
+    if (dot.classList.contains('done')) {
+      dot.childNodes.forEach(n => { if (n.nodeType === 3) n.textContent = '✓'; });
+    } else {
+      dot.childNodes.forEach(n => { if (n.nodeType === 3) n.textContent = String(i); });
+    }
+  }
+}
+
+/* ═══════════════════════════════════════════════════════
+   STEP 1 — CONFIGURE
+══════════════════════════════════════════════════════ */
+function bindStep1() {
+  // tone multi-select
+  document.querySelectorAll('#tone-chips .chip').forEach(c => {
+    c.addEventListener('click', () => {
+      c.classList.toggle('sel');
+      S.tones = [...document.querySelectorAll('#tone-chips .chip.sel')].map(x => x.dataset.tone);
+    });
+  });
+  // length single-select
+  document.querySelectorAll('#length-chips .chip').forEach(c => {
+    c.addEventListener('click', () => {
+      document.querySelectorAll('#length-chips .chip').forEach(x => x.classList.remove('sel'));
+      c.classList.add('sel');
+      S.length = parseInt(c.dataset.len);
+    });
+  });
+  document.getElementById('gen-btn').addEventListener('click', runGenerate);
+}
+
+async function runGenerate() {
+  const topic  = document.getElementById('topic-input').value.trim();
+  const author = document.getElementById('author-input').value.trim();
+  if (!topic) { showErr('err-1', 'err-1-msg', 'Please enter a topic.'); return; }
+  hideErr('err-1');
+
+  S.topic  = topic;
+  S.author = author || S.author;
+  const tone = S.tones.length ? S.tones.join(', ') : 'Thoughtful';
+
+  goTo(2);
+  startLoader();
+
+  try {
+    const data = await apiFetch('/api/generate', 'POST', { topic, author: S.author, tone, length: S.length });
+    if (data.error) throw new Error(data.error);
+    S.data = data;
+    stopLoader();
+    renderPosts();
+    goTo(3);
+  } catch (e) {
+    stopLoader();
+    goTo(1);
+    showErr('err-1', 'err-1-msg', e.message || 'Generation failed. Please try again.');
+  }
+}
+
+/* ═══════════════════════════════════════════════════════
+   STEP 2 — LOADER
+══════════════════════════════════════════════════════ */
+const MSGS = [
+  'Scanning LinkedIn for what\'s trending...',
+  'Reading industry blogs and newsletters...',
+  'Checking HubSpot, Medium, Substack...',
+  'Analyzing Reddit and Twitter discussions...',
+  'Finding what your competitors haven\'t seen yet...',
+  'Surfacing first-mover insights...',
+  'Researching across 50+ content sources...',
+  'Looking for the data point that stops scrolls...',
+  'Crafting 5 completely different angles...',
+  'Almost ready...',
+];
+let _progTimer, _typeTimer, _msgIdx = 0, _progVal = 0;
+
+function startLoader() {
+  _msgIdx  = 0; _progVal = 0;
+  document.getElementById('prog-bar').style.width = '0%';
+  document.getElementById('typewriter-txt').textContent = MSGS[0];
+  const dur = 15000;
+  const tick = 120;
+  const step = 100 / (dur / tick);
+  _progTimer = setInterval(() => {
+    _progVal = Math.min(_progVal + step, 95);
+    document.getElementById('prog-bar').style.width = _progVal + '%';
+  }, tick);
+  _typeTimer = setInterval(() => {
+    _msgIdx = (_msgIdx + 1) % MSGS.length;
+    document.getElementById('typewriter-txt').textContent = MSGS[_msgIdx];
+  }, 2500);
+}
+
+function stopLoader() {
+  clearInterval(_progTimer); clearInterval(_typeTimer);
+  document.getElementById('prog-bar').style.width = '100%';
+}
+
+/* ═══════════════════════════════════════════════════════
+   STEP 3 — PICK YOUR POST
+══════════════════════════════════════════════════════ */
+function renderPosts() {
+  // topic display
+  document.getElementById('topic-display').textContent = '"' + S.topic + '"';
+
+  // sources pills
+  const sr = document.getElementById('sources-row');
+  sr.innerHTML = '';
+  (S.data.sources || []).forEach(s => {
+    const p = document.createElement('span');
+    p.className = 'source-pill';
+    p.textContent = s.source;
+    sr.appendChild(p);
+  });
+
+  // posts
+  const grid = document.getElementById('posts-grid');
+  grid.innerHTML = '';
+  S.selectedId = null;
+  document.getElementById('use-post-btn').disabled = true;
+
+  (S.data.posts || []).forEach(post => {
+    const card = document.createElement('div');
+    card.className = 'post-card';
+    card.dataset.id = post.id;
+
+    const angleBadge = angleBadgeClass(post.angle);
+    const reachBadge = reachBadgeClass(post.estimatedReach);
+
+    card.innerHTML = `
+      <div class="card-badges">
+        <span class="angle-badge ${angleBadge}">${esc(post.angle)}</span>
+        <span class="reach-badge ${reachBadge}">${esc(post.estimatedReach)}</span>
+      </div>
+      <div class="post-hook">${esc(post.hook)}</div>
+      <div class="post-preview">${esc(post.preview)}</div>
+      <div class="post-why">✦ ${esc(post.whyItWorks)}</div>
+      <button class="btn btn-outline btn-sm sel-btn">Select This Post →</button>
+    `;
+
+    card.addEventListener('click', () => selectCard(card, post));
+    card.querySelector('.sel-btn').addEventListener('click', e => {
+      e.stopPropagation(); selectCard(card, post);
+    });
+
+    grid.appendChild(card);
+  });
+
+  document.getElementById('use-post-btn').onclick = () => {
+    if (!S.selectedId) return;
+    loadStep4();
+    goTo(4);
+  };
+}
+
+function selectCard(card, post) {
+  document.querySelectorAll('.post-card').forEach(c => c.classList.remove('selected'));
+  card.classList.add('selected');
+  S.selectedId = post.id;
+  S.postText   = post.fullPost;
+  document.getElementById('use-post-btn').disabled = false;
+}
+
+function angleBadgeClass(angle) {
+  const a = (angle || '').toLowerCase();
+  if (a.includes('stat') || a.includes('data'))   return 'badge-stat';
+  if (a.includes('contrarian'))                    return 'badge-contrarian';
+  if (a.includes('story') || a.includes('micro'))  return 'badge-story';
+  if (a.includes('how') || a.includes('practical'))return 'badge-howto';
+  if (a.includes('predict') || a.includes('future'))return 'badge-prediction';
+  return 'badge-stat';
+}
+
+function reachBadgeClass(reach) {
+  const r = (reach || '').toLowerCase();
+  if (r.includes('viral'))  return 'badge-viral';
+  if (r.includes('high'))   return 'badge-high';
+  return 'badge-medium';
+}
+
+/* ═══════════════════════════════════════════════════════
+   STEP 4 — CUSTOMIZE
+══════════════════════════════════════════════════════ */
+function loadStep4() {
+  const ed = document.getElementById('post-editor');
+  ed.value = S.postText;
+  updateCharCount();
+  updatePreview();
+  updatePreviewMeta();
+}
+
+function bindStep4() {
+  // live textarea → preview
+  document.getElementById('post-editor').addEventListener('input', () => {
+    S.postText = document.getElementById('post-editor').value;
+    updateCharCount();
+    updatePreview();
+  });
+
+  // image toggle
+  document.getElementById('img-toggle').addEventListener('change', function () {
+    const opts = document.getElementById('img-opts');
+    if (this.checked) opts.classList.add('open');
+    else { opts.classList.remove('open'); removeImage(); }
+  });
+
+  // style chips (single-select)
+  document.querySelectorAll('#style-chips .chip').forEach(c => {
+    c.addEventListener('click', () => {
+      document.querySelectorAll('#style-chips .chip').forEach(x => x.classList.remove('sel'));
+      c.classList.add('sel');
+      S.imageStyle = c.dataset.style;
+    });
+  });
+
+  // generate image
+  document.getElementById('gen-img-btn').addEventListener('click', generateImage);
+
+  // remove image
+  document.getElementById('rm-img-btn').addEventListener('click', removeImage);
+
+  // regenerate post
+  document.getElementById('regen-btn').addEventListener('click', regenPost);
+
+  // go to review
+  document.getElementById('to-review-btn').addEventListener('click', () => {
+    S.postText = document.getElementById('post-editor').value.trim();
+    if (!S.postText) return;
+    loadReview();
+    goTo(5);
+  });
+}
+
+function updateCharCount() {
+  const len = document.getElementById('post-editor').value.length;
+  const el  = document.getElementById('char-count');
+  el.innerHTML = `<span class="${len > 3000 ? 'over' : ''}">${len}</span> / 3000`;
+}
+
+function updatePreview() {
+  document.getElementById('prev-text').textContent = S.postText || 'Your post will appear here…';
+}
+
+function updatePreviewMeta() {
+  const av = initials(S.personName);
+  document.getElementById('prev-avatar').textContent = av;
+  document.getElementById('prev-name').textContent   = S.personName;
+}
+
+async function generateImage() {
+  const btn = document.getElementById('gen-img-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner spinner-blue"></div> Generating…';
+  hideErr('err-img');
+
+  try {
+    const d = await apiFetch('/api/image', 'POST', { prompt: S.topic, style: S.imageStyle });
+    if (d.error) throw new Error(d.error);
+    if (!d.url)  throw new Error('No image URL returned');
+    S.imageUrl = d.url;
+
+    document.getElementById('gen-img').src          = d.url;
+    document.getElementById('img-preview-box').style.display = 'block';
+    document.getElementById('prev-img').src          = d.url;
+    document.getElementById('prev-img-wrap').style.display   = 'block';
+  } catch (e) {
+    showErr('err-img', 'err-img-msg', e.message);
+    S.imageUrl = null;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Generate Image';
+  }
+}
+
+function removeImage() {
+  S.imageUrl = null;
+  document.getElementById('gen-img').src = '';
+  document.getElementById('img-preview-box').style.display = 'none';
+  document.getElementById('prev-img-wrap').style.display   = 'none';
+}
+
+async function regenPost() {
+  const btn = document.getElementById('regen-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner spinner-blue"></div> Regenerating…';
+
+  try {
+    const tone = S.tones.length ? S.tones.join(', ') : 'Thoughtful';
+    const data = await apiFetch('/api/generate', 'POST', {
+      topic: S.topic, author: S.author, tone, length: S.length,
+    });
+    if (data.error) throw new Error(data.error);
+    S.data = data;
+
+    // Find matching angle or use first
+    const cur   = (S.data.posts || []).find(p => p.id === S.selectedId);
+    const angle = cur ? cur.angle : null;
+    const match = (data.posts || []).find(p => p.angle === angle) || data.posts?.[0];
+    if (match) {
+      S.postText = match.fullPost;
+      S.selectedId = match.id;
+      document.getElementById('post-editor').value = S.postText;
+      updateCharCount();
+      updatePreview();
+    }
+  } catch (e) {
+    alert('Regeneration failed: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '↻ Regenerate this post';
+  }
+}
+
+/* ═══════════════════════════════════════════════════════
+   STEP 5 — REVIEW
+══════════════════════════════════════════════════════ */
+function loadReview() {
+  document.getElementById('rev-text').textContent  = S.postText;
+  document.getElementById('rev-avatar').textContent = initials(S.personName);
+  document.getElementById('rev-name').textContent   = S.personName;
+
+  if (S.imageUrl) {
+    document.getElementById('rev-img').src = S.imageUrl;
+    document.getElementById('rev-img-wrap').style.display = 'block';
+  } else {
+    document.getElementById('rev-img-wrap').style.display = 'none';
+  }
+}
+
+function bindStep5() {
+  document.getElementById('back-to-edit-btn').addEventListener('click', () => goTo(4));
+  document.getElementById('post-btn').addEventListener('click', publishPost);
+}
+
+async function publishPost() {
+  hideErr('err-5');
+  if (!S.personId) {
+    showErr('err-5', 'err-5-msg', 'Could not get your LinkedIn Person ID. Check your LI_TOKEN.');
+    return;
+  }
+  const btn = document.getElementById('post-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div> Posting…';
+
+  try {
+    const d = await apiFetch('/api/linkedin/post', 'POST', {
+      text: S.postText, personId: S.personId,
+    });
+    if (d.status && d.status !== 201 && d.status !== 200 && !d.id) {
+      throw new Error(d.message || JSON.stringify(d));
+    }
+    goTo(6);
+    launchConfetti();
+  } catch (e) {
+    showErr('err-5', 'err-5-msg', e.message || 'Posting failed. Try again.');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '✓ Confirm &amp; Post to LinkedIn';
+  }
+}
+
+/* ═══════════════════════════════════════════════════════
+   STEP 6 — SUCCESS
+══════════════════════════════════════════════════════ */
+function bindStep6() {
+  document.getElementById('restart-btn').addEventListener('click', () => {
+    S.topic = ''; S.tones = []; S.length = 100; S.data = null;
+    S.selectedId = null; S.postText = ''; S.imageUrl = null;
+
+    document.getElementById('topic-input').value   = '';
+    document.getElementById('author-input').value  = 'Mani Grewal - Product Manager';
+    document.querySelectorAll('#tone-chips .chip').forEach(c => c.classList.remove('sel'));
+    document.querySelectorAll('#length-chips .chip').forEach(c => c.classList.remove('sel'));
+    document.querySelector('[data-len="100"]').classList.add('sel');
+    document.getElementById('img-toggle').checked  = false;
+    document.getElementById('img-opts').classList.remove('open');
+    removeImage();
+    hideErr('err-1');
+    document.getElementById('confetti-wrap').innerHTML = '';
+    goTo(1);
+  });
+}
+
+function launchConfetti() {
+  const wrap   = document.getElementById('confetti-wrap');
+  wrap.innerHTML = '';
+  const colors = ['#0A66C2','#FFB020','#FF4B4B','#57D9A3','#A78BFA','#FB923C','#34D399','#F9A8D4'];
+  for (let i = 0; i < 120; i++) {
+    const p = document.createElement('div');
+    p.className = 'conf';
+    p.style.cssText = [
+      `left:${Math.random()*100}vw`,
+      `background:${colors[i % colors.length]}`,
+      `animation-delay:${(Math.random()*2).toFixed(2)}s`,
+      `animation-duration:${(Math.random()*2+2.5).toFixed(2)}s`,
+      `width:${Math.random()>0.5?'8px':'12px'}`,
+      `height:${Math.random()>0.5?'8px':'12px'}`,
+      `border-radius:${Math.random()>0.5?'50%':'2px'}`,
+    ].join(';');
+    wrap.appendChild(p);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════
+   UTILITIES
+══════════════════════════════════════════════════════ */
+async function apiFetch(path, method = 'GET', body = null) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(API + path, opts);
+  return r.json();
+}
+
+function showErr(boxId, msgId, msg) {
+  const box = document.getElementById(boxId);
+  const el  = document.getElementById(msgId);
+  if (el)  el.textContent = msg;
+  if (box) box.style.display = 'flex';
+}
+function hideErr(boxId) {
+  const box = document.getElementById(boxId);
+  if (box) box.style.display = 'none';
+}
+
+function initials(name) {
+  return (name || 'U').split(/[\s·]+/).map(w => w[0]).join('').toUpperCase().slice(0, 2);
+}
+
+function esc(str) {
+  return String(str || '')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
