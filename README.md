@@ -29,7 +29,7 @@ An AI-powered LinkedIn post generator that researches your topic, writes 5 uniqu
 ### 1. Clone the repo
 
 ```bash
-git clone https://github.com/.......linkedin-agent.git
+git https://github.com/ManiShergill/Linkedin_Agent
 cd linkedin-agent
 ```
 
